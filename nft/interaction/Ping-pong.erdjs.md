@@ -1,4 +1,4 @@
-# lottery
+# nft
 
 First [set up a node terminal](../../../../tutorial/src/interaction/interaction-basic.md).
 
@@ -6,7 +6,7 @@ First [set up a node terminal](../../../../tutorial/src/interaction/interaction-
 let erdjs = await require('@elrondnetwork/erdjs');
 let { erdSys, Egld, wallets: { alice, bob, carol, dan } } = await erdjs.setupInteractive("local-testnet");
 
-let pingPong = await erdSys.loadWrapper("contracts/examples/lottery");
+let pingPong = await erdSys.loadWrapper("contracts/examples/nft");
 
 await pingPong.sender(alice).gas(150_000_000).call.deploy(Egld(0.5), 2 * 60, null, Egld(1.5));
 

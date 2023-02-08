@@ -5,18 +5,19 @@
 #![no_std]
 
 elrond_wasm_node::wasm_endpoints! {
-    lottery
+    nft
     (
-        didUserPing
+        buy_ticket
+        claim
         getAcceptedPaymentToken
-        getDurationTimestamp
+        getParticipants
+        getParticipantsReward
+        getRemainingRewards
+        getRemainingSupply
         getTicketPrice
-        getPongEnableTimestamp
-        getTimeToPong
-        getUserPingTimestamp
-        myCustomFunction
-        ping
-        pong
+        getTotalSupply
+        getUserReward
+        set_price
     )
 }
 

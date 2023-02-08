@@ -1,1 +1,1 @@
-# lottery-smart-contract
+# smart-contract

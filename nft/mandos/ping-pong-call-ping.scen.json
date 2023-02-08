@@ -4,7 +4,7 @@
     "steps": [
         {
             "step": "externalSteps",
-            "path": "lottery-init.scen.json"
+            "path": "nft-init.scen.json"
         },
         {
             "step": "setState",
@@ -16,7 +16,7 @@
             "step": "scCall",
             "tx": {
                 "from": "address:participant1",
-                "to": "sc:lottery",
+                "to": "sc:nft",
                 "value": "500,000,000,000",
                 "function": "ping",
                 "arguments": [],
@@ -47,7 +47,7 @@
                     "balance": "2,500,000,000,000",
                     "storage": {}
                 },
-                "sc:lottery": {
+                "sc:nft": {
                     "nonce": "0",
                     "balance": "500,000,000,000",
                     "storage": {
@@ -56,7 +56,7 @@
                         "str:acceptedPaymentTokenId": "str:EGLD",
                         "str:userPingTimestamp|address:participant1": "781"
                     },
-                    "code": "file:../output/lottery.wasm"
+                    "code": "file:../output/nft.wasm"
                 }
             }
         }

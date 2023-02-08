@@ -1,5 +1,5 @@
 [package]
-name = "lottery-wasm"
+name = "nft-wasm"
 version = "0.0.1"
 authors = [ "Bruda Claudiu-Marcel <claudiu725@yahoo.com>",]
 edition = "2018"
@@ -17,7 +17,7 @@ lto = true
 debug = false
 panic = "abort"
 
-[dependencies.lottery]
+[dependencies.nft]
 path = ".."
 
 [dependencies.elrond-wasm-node]

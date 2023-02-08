@@ -1,22 +1,16 @@
 {
-    "name": "trying withdraw the funds before the deadline has passed",
+    "name": "try withdraw the funds again by calling pong a second time",
     "gasSchedule": "v4",
     "steps": [
         {
             "step": "externalSteps",
-            "path": "lottery-call-ping.scen.json"
-        },
-        {
-            "step": "setState",
-            "currentBlockInfo": {
-                "blockTimestamp": "123,000"
-            }
+            "path": "nft-call-pong.scen.json"
         },
         {
             "step": "scCall",
             "tx": {
                 "from": "address:participant1",
-                "to": "sc:lottery",
+                "to": "sc:nft",
                 "value": "0",
                 "function": "pong",
                 "arguments": [],
@@ -25,7 +19,7 @@
             },
             "expect": {
                 "status": "4",
-                "message": "str:Cannot pong before deadline",
+                "message": "str:Must ping first",
                 "gas": "*",
                 "refund": "*"
             }

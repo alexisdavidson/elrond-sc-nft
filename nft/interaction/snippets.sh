@@ -1,5 +1,5 @@
-PEM_FILE="./lottery.pem"
-PING_PONG_CONTRACT="output/lottery.wasm"
+PEM_FILE="./nft.pem"
+PING_PONG_CONTRACT="output/nft.wasm"
 
 PROXY_ARGUMENT="--proxy=https://devnet-api.elrond.com"
 CHAIN_ARGUMENT="--chain=D"
