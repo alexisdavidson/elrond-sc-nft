@@ -1,138 +1,101 @@
 #![no_std]
 
-elrond_wasm::imports!();
+multiversx_sc::imports!();
+multiversx_sc::derive_imports!();
 
-#[elrond_wasm::contract]
-pub trait Nft {
+mod nft_module;
+
+#[derive(TypeAbi, TopEncode, TopDecode)]
+pub struct ExampleAttributes {
+    pub creation_timestamp: u64,
+}
+
+#[multiversx_sc::contract]
+pub trait NftMinter: nft_module::NftModule {
     #[init]
-    fn init(
-        &self,
-        ticket_price: BigUint,
-        rew_1: u64,
-        rew_2: u64,
-        rew_3: u64,
-        rew_4: u64,
-        rew_5: u64, // 3, 25, 7, 64, 1
-        opt_token_id: OptionalValue<EgldOrEsdtTokenIdentifier>,
-    ) {
-        require!(ticket_price > 0, "Ticket price cannot be set to zero");
-        self.ticket_price().set(&ticket_price);
+    fn init(&self) {}
 
-        let token_id = match opt_token_id {
-            OptionalValue::Some(t) => t,
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::redundant_closure)]
+    #[only_owner]
+    #[endpoint(createNft)]
+    fn create_nft(
+        &self,
+        name: ManagedBuffer,
+        royalties: BigUint,
+        uri: ManagedBuffer,
+        selling_price: BigUint,
+        opt_token_used_as_payment: OptionalValue<TokenIdentifier>,
+        opt_token_used_as_payment_nonce: OptionalValue<u64>,
+    ) {
+        let token_used_as_payment = match opt_token_used_as_payment {
+            OptionalValue::Some(token) => EgldOrEsdtTokenIdentifier::esdt(token),
             OptionalValue::None => EgldOrEsdtTokenIdentifier::egld(),
         };
-        self.accepted_payment_token_id().set(&token_id);
+        require!(
+            token_used_as_payment.is_valid(),
+            "Invalid token_used_as_payment arg, not a valid token ID"
+        );
 
-        for i in 0..rew_1 {
-            self.rew_vec().push(&1);
-        }
-        for i in 0..rew_2 {
-            self.rew_vec().push(&2);
-        }
-        for i in 0..rew_3 {
-            self.rew_vec().push(&3);
-        }
-        for i in 0..rew_4 {
-            self.rew_vec().push(&4);
-        }
-        for i in 0..rew_5 {
-            self.rew_vec().push(&5);
-        }
+        let token_used_as_payment_nonce = if token_used_as_payment.is_egld() {
+            0
+        } else {
+            match opt_token_used_as_payment_nonce {
+                OptionalValue::Some(nonce) => nonce,
+                OptionalValue::None => 0,
+            }
+        };
 
-        let totalSupply = (rew_1 + rew_2 + rew_3 + rew_4 + rew_5) as u64;
-        self.total_supply().set(&totalSupply);
-        self.remaining_supply().set(&totalSupply);
+        let attributes = ExampleAttributes {
+            creation_timestamp: self.blockchain().get_block_timestamp(),
+        };
+        self.create_nft_with_attributes(
+            name,
+            royalties,
+            attributes,
+            uri,
+            selling_price,
+            token_used_as_payment,
+            token_used_as_payment_nonce,
+        );
     }
 
-    // endpoints
-    
-    /// Buy nft ticket
-    #[payable("*")]
-    #[endpoint]
-    fn buy_ticket(&self) {
-        let (payment_token, payment_amount) = self.call_value().egld_or_single_fungible_esdt();
-        require!(payment_token == self.accepted_payment_token_id().get(), "Invalid payment token");
-        require!(payment_amount == self.ticket_price().get(), "The payment must match the ticket price");
-
-        let caller = self.blockchain().get_caller();
-        require!(self.user_reward(&caller).is_empty(), "Already received reward");
-
-        let is_a_sc = self.blockchain().is_smart_contract(&self.blockchain().get_caller());
-        require!(!is_a_sc, "Cannot call this function from a smart contract");
-
-        let current_block_timestamp = self.blockchain().get_block_timestamp();
-        let reward_index = current_block_timestamp % (self.rew_vec().len()) as u64 + 1_u64;
-        let reward = self.rew_vec().get(reward_index as usize);
-        self.user_reward(&caller).set(&reward);
-
-        self.rew_vec().swap_remove(reward_index as usize);
-        self.participants().push(&caller);
-        self.participants_reward().push(&reward);
-        self.remaining_supply().set(self.remaining_supply().get() - 1);
-
-        self.reward_event(&caller, &reward);
-    }
-    
-    /// Set ticket price
+    // The marketplace SC will send the funds directly to the initial caller, i.e. the owner
+    // The caller has to know which tokens they have to claim,
+    // by giving the correct token ID and token nonce
     #[only_owner]
-    #[endpoint]
-    fn set_price(&self, ticket_price: BigUint ) {
-        require!(ticket_price > 0, "Ticket price cannot be set to zero");
-        self.ticket_price().set(&ticket_price);
-    }
-    
-    // Claim balance
-    #[only_owner]
-    #[endpoint]
-    fn claim(&self) {
+    #[endpoint(claimRoyaltiesFromMarketplace)]
+    fn claim_royalties_from_marketplace(
+        &self,
+        marketplace_address: ManagedAddress,
+        token_id: TokenIdentifier,
+        token_nonce: u64,
+    ) {
         let caller = self.blockchain().get_caller();
-        let egld_balance = self
-            .blockchain()
-            .get_sc_balance(&EgldOrEsdtTokenIdentifier::egld(), 0);
-
-        self.send().direct_egld(&caller, &egld_balance);
+        self.marketplace_proxy(marketplace_address)
+            .claim_tokens(token_id, token_nonce, caller)
+            .async_call()
+            .call_and_exit()
     }
 
-    // views
-    // ...
+    #[proxy]
+    fn marketplace_proxy(
+        &self,
+        sc_address: ManagedAddress,
+    ) -> nft_marketplace_proxy::Proxy<Self::Api>;
+}
 
-    // storage
+mod nft_marketplace_proxy {
+    multiversx_sc::imports!();
 
-    #[view(getAcceptedPaymentToken)]
-    #[storage_mapper("acceptedPaymentTokenId")]
-    fn accepted_payment_token_id(&self) -> SingleValueMapper<EgldOrEsdtTokenIdentifier>;
-
-    #[view(getTicketPrice)]
-    #[storage_mapper("ticketPrice")]
-    fn ticket_price(&self) -> SingleValueMapper<BigUint>;
-
-    #[view(getTotalSupply)]
-    #[storage_mapper("totalSupply")]
-    fn total_supply(&self) -> SingleValueMapper<u64>;
-
-    #[view(getRemainingSupply)]
-    #[storage_mapper("remainingSupply")]
-    fn remaining_supply(&self) -> SingleValueMapper<u64>;
-
-    #[view(getRemainingRewards)]
-    #[storage_mapper("remainingRewards")]
-    fn rew_vec(&self) -> VecMapper<u64>;
-
-    #[view(getParticipants)]
-    #[storage_mapper("participants")]
-    fn participants(&self) -> VecMapper<ManagedAddress>;
-
-    #[view(getParticipantsReward)]
-    #[storage_mapper("participantsReward")]
-    fn participants_reward(&self) -> VecMapper<u64>;
-
-    #[view(getUserReward)]
-    #[storage_mapper("userReward")]
-    fn user_reward(&self, address: &ManagedAddress) -> SingleValueMapper<u64>;
-
-    // events
-
-    #[event("rewardEvent")]
-    fn reward_event(&self, #[indexed] user: &ManagedAddress, rew: &u64);
+    #[multiversx_sc::proxy]
+    pub trait NftMarketplace {
+        #[endpoint(claimTokens)]
+        fn claim_tokens(
+            &self,
+            token_id: TokenIdentifier,
+            token_nonce: u64,
+            claim_destination: ManagedAddress,
+        );
+    }
 }
